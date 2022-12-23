@@ -40,14 +40,23 @@ class BertSelfAttention(nn.Module):
     # and get back a score matrix S of [bs, num_attention_heads, seq_len, seq_len]
     # S[*, i, j, k] represents the (unnormalized)attention score between the j-th and k-th token, given by i-th attention head
     # before normalizing the scores, use the attention mask to mask out the padding token scores
-    # Note again: in the attention_mask non-padding tokens with 0 and padding tokens with a large negative number 
+    # Note again: in the attention_mask non-padding tokens with 0 and padding tokens with a large negative number
+    score = torch.matmul(query, key.transpose(-1, -2))
+    print("score", score.shape)
 
+    # Multiply with the attention mask.
+    score = torch.multiply(score, attention_mask) / math.sqrt(self.attention_head_size)
+    print("score after masking", score.shape)
     # normalize the scores
+    normalized_score = F.softmax(score, dim=-1)
+    print("V after normalizing: ", normalized_score)
 
-    # multiply the attention scores to the value and get back V' 
+    # multiply the attention scores to the value and get back V'
+    V = torch.matmul(normalized_score, value)
+    print("V after multiplying with V", V.shape)
 
     # next, we need to concat multi-heads and recover the original shape [bs, seq_len, num_attention_heads * attention_head_size = hidden_size]
-    raise NotImplementedError
+    # V = torch.concat(V)
 
   def forward(self, hidden_states, attention_mask):
     """
@@ -154,12 +163,12 @@ class BertModel(BertPreTrainedModel):
 
     # get word embedding from self.word_embedding
     # todo
-    inputs_embeds = None
+    inputs_embeds = self.word_embedding(input_ids)
 
 
     # get position index and position embedding from self.pos_embedding
     pos_ids = self.position_ids[:, :seq_length]
-    pos_embeds = None
+    pos_embeds = self.pos_embedding(pos_ids)
 
     # get token type ids, since we are not consider token type, just a placeholder
     tk_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
@@ -172,7 +181,7 @@ class BertModel(BertPreTrainedModel):
     embeds = self.embed_layer_norm(embeds)
     embeds = self.embed_dropout(embeds)
 
-    raise NotImplementedError
+    return embeds
 
   def encode(self, hidden_states, attention_mask):
     """
